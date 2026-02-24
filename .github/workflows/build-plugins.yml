@@ -1,0 +1,181 @@
+name: Build Plugins
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+*'
+
+env:
+  USD_VERSION: "25.11"
+  USD_TAG: "v25.11"
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows_x64
+            variant: Release
+            usd_archive: "Lumengine.USD_25.11.windows_x64.py3.11_Release.zip"
+          - os: windows-latest
+            platform: windows_x64
+            variant: Debug
+            usd_archive: "Lumengine.USD_25.11.windows_x64.py3.11_Debug.zip"
+          - os: ubuntu-22.04
+            platform: linux_x64
+            variant: Release
+            usd_archive: "Lumengine.USD_25.11.linux_x64.py3.11_Release.tar.gz"
+          - os: ubuntu-22.04
+            platform: linux_x64
+            variant: Debug
+            usd_archive: "Lumengine.USD_25.11.linux_x64.py3.11_Debug.tar.gz"
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Download USD build
+      shell: bash
+      run: |
+          gh release download ${{ env.USD_TAG }} \
+            --repo Lumengine/OpenUSDBuild \
+            --pattern "${{ matrix.usd_archive }}" \
+            --dir .
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract USD (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+          7z x "${{ matrix.usd_archive }}" -o"usd_build" -y
+
+    - name: Extract USD (Linux)
+      if: runner.os == 'Linux'
+      run: |
+          mkdir -p usd_build
+          tar -xzf "${{ matrix.usd_archive }}" -C usd_build
+
+    - name: Install Linux dependencies
+      if: runner.os == 'Linux'
+      run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential ninja-build \
+            libgl1-mesa-dev libglu1-mesa-dev
+
+    # --- FBX SDK ---
+    - name: Get latest successful run ID of the fbx sdk workflow
+      shell: bash
+      id: get-run-id
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+          RUN_ID=$(gh run list --repo ${{ github.repository }} --workflow fbx-sdk.yml --limit 1 --json databaseId,status --jq '.[] | select(.status=="completed") | .databaseId')
+          echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
+          echo "Run ID: $RUN_ID"
+
+    - name: Download FBX SDK Artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: ${{ runner.os }}-FBX-SDK
+        path: ${{ github.workspace }}/FBXSDK
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        repository: ${{ github.repository }}
+        run-id: ${{ env.RUN_ID }}
+
+    - name: Install FBX SDK (Windows)
+      if: runner.os == 'Windows'
+      shell: bash
+      run: |
+          FBX_FOLDER=$(echo "${{ github.workspace }}/FBXSDK" | sed 's|\\|/|g')
+          FBX_INSTALL_DIR=$(echo "${{ github.workspace }}/FBX_SDK_INSTALL" | sed 's|\\|/|g')
+          mkdir -p "$FBX_INSTALL_DIR"
+          7z x "$FBX_FOLDER/fbx202037_fbxsdk_vs2022_win.exe" -o"$FBX_INSTALL_DIR" -y
+          echo "FBX_INSTALL_DIR=$FBX_INSTALL_DIR" >> $GITHUB_ENV
+
+    - name: Install FBX SDK (Linux)
+      if: runner.os == 'Linux'
+      run: |
+          FBX_FOLDER="${{ github.workspace }}/FBXSDK"
+          FBX_INSTALL_DIR="${{ github.workspace }}/FBX_SDK_INSTALL"
+          chmod +r "$FBX_FOLDER/fbx202037_fbxsdk_gcc_linux.tar.gz"
+          tar -xzf "$FBX_FOLDER/fbx202037_fbxsdk_gcc_linux.tar.gz" -C "$FBX_FOLDER"
+          mkdir -p "$FBX_INSTALL_DIR"
+          yes yes | "$FBX_FOLDER/fbx202037_fbxsdk_linux" "$FBX_INSTALL_DIR"
+          echo "FBX_INSTALL_DIR=$FBX_INSTALL_DIR" >> $GITHUB_ENV
+
+    # --- Configure & Build ---
+    - name: Configure (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+          $env:USD_BUILD_PATH = "${{ github.workspace }}/usd_build"
+          $env:USD_PYTHON_PATH = (python -c "import sys, os; print(os.path.dirname(sys.executable))")
+          cmake -S . -B build -G "Visual Studio 17 2022" `
+            -Dpxr_ROOT="${{ github.workspace }}/usd_build" `
+            -DUSD_FILEFORMATS_ENABLE_FBX=ON `
+            -DFBXSDK_ROOT="${{ env.FBX_INSTALL_DIR }}" `
+            -DUSD_FILEFORMATS_ENABLE_SBSAR=OFF `
+            -DUSD_FILEFORMATS_BUILD_TESTS=OFF `
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+
+    - name: Configure (Linux)
+      if: runner.os == 'Linux'
+      run: |
+          export USD_BUILD_PATH="${{ github.workspace }}/usd_build"
+          export USD_PYTHON_PATH="$(python -c 'import sys, os; print(os.path.dirname(sys.executable))')"
+          cmake -S . -B build -G Ninja \
+            -Dpxr_ROOT="${{ github.workspace }}/usd_build" \
+            -DUSD_FILEFORMATS_ENABLE_FBX=ON \
+            -DFBXSDK_ROOT="${{ env.FBX_INSTALL_DIR }}" \
+            -DUSD_FILEFORMATS_ENABLE_SBSAR=OFF \
+            -DUSD_FILEFORMATS_BUILD_TESTS=OFF \
+            -DCMAKE_BUILD_TYPE=${{ matrix.variant }} \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+
+    - name: Build (Windows)
+      if: runner.os == 'Windows'
+      run: cmake --build build --config ${{ matrix.variant }}
+
+    - name: Build (Linux)
+      if: runner.os == 'Linux'
+      run: cmake --build build
+
+    - name: Install
+      run: cmake --install build --config ${{ matrix.variant }} --prefix install
+
+    - name: Archive (Windows)
+      if: runner.os == 'Windows'
+      id: archive
+      shell: pwsh
+      run: |
+          $tagName = & git describe --tags
+          $version = $tagName.TrimStart("v")
+          $archiveName = "Lumengine.USDFileformatPlugins_${version}.usd${{ env.USD_VERSION }}.${{ matrix.platform }}.py${{ env.PYTHON_VERSION }}_${{ matrix.variant }}.zip"
+          echo "ARCHIVE_NAME=$archiveName" >> $env:GITHUB_OUTPUT
+          7z a "$archiveName" ./install/plugin ./install/bin
+
+    - name: Archive (Linux)
+      if: runner.os == 'Linux'
+      id: archive-linux
+      shell: bash
+      run: |
+          TAG=$(git describe --tags)
+          VERSION=${TAG#v}
+          ARCHIVE_NAME="Lumengine.USDFileformatPlugins_${VERSION}.usd${{ env.USD_VERSION }}.${{ matrix.platform }}.py${{ env.PYTHON_VERSION }}_${{ matrix.variant }}.tar.gz"
+          echo "ARCHIVE_NAME=$ARCHIVE_NAME" >> $GITHUB_OUTPUT
+          tar -czvf "$ARCHIVE_NAME" -C install plugin bin
+
+    - name: Publish
+      uses: softprops/action-gh-release@v1
+      with:
+          files: ${{ steps.archive.outputs.ARCHIVE_NAME || steps.archive-linux.outputs.ARCHIVE_NAME }}
+      env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

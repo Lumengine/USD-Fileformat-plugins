@@ -1,13 +1,14 @@
 name: CI Workflow
 
 on:
-  pull_request:
-    branches: [main]
-  push:
-    branches: [main]
-  schedule:
-    # Cron runs at 16:00 UTC which corresponds to 09:00 AM PT
-    - cron: "0 16 * * 1"
+  workflow_dispatch:
+  # Disabled – replaced by build-plugins.yml
+  # pull_request:
+  #   branches: [main]
+  # push:
+  #   branches: [main]
+  # schedule:
+  #   - cron: "0 16 * * 1"
 
 jobs:
   prepare-matrix:
