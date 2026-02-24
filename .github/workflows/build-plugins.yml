@@ -116,15 +116,17 @@ jobs:
       if: runner.os == 'Windows'
       shell: pwsh
       run: |
-          $env:USD_BUILD_PATH = "${{ github.workspace }}/usd_build"
-          $env:USD_PYTHON_PATH = (python -c "import sys, os; print(os.path.dirname(sys.executable))")
+          $env:USD_BUILD_PATH = ("${{ github.workspace }}/usd_build" -replace '\\', '/')
+          $env:USD_PYTHON_PATH = ((python -c "import sys, os; print(os.path.dirname(sys.executable))") -replace '\\', '/')
+          $usdRoot = $env:USD_BUILD_PATH
+          $fbxRoot = ("${{ env.FBX_INSTALL_DIR }}" -replace '\\', '/')
           cmake -S . -B build -G "Visual Studio 17 2022" `
-            -Dpxr_ROOT="${{ github.workspace }}/usd_build" `
+            -Dpxr_ROOT="$usdRoot" `
             -DUSD_FILEFORMATS_ENABLE_FBX=ON `
-            -DFBXSDK_ROOT="${{ env.FBX_INSTALL_DIR }}" `
+            -DFBXSDK_ROOT="$fbxRoot" `
             -DUSD_FILEFORMATS_ENABLE_SBSAR=OFF `
             -DUSD_FILEFORMATS_BUILD_TESTS=OFF `
-            -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+            "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
 
     - name: Configure (Linux)
       if: runner.os == 'Linux'
