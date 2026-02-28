@@ -6,8 +6,8 @@ on:
       - 'v[0-9]+.[0-9]+*'
 
 env:
-  USD_VERSION: "25.11"
-  USD_TAG: "v25.11"
+  USD_VERSION: "26.03"
+  USD_TAG: "v26.03"
   PYTHON_VERSION: "3.11"
 
 jobs:
@@ -19,19 +19,19 @@ jobs:
           - os: windows-latest
             platform: windows_x64
             variant: Release
-            usd_archive: "Lumengine.USD_25.11.windows_x64.py3.11_Release.zip"
+            usd_archive: "Lumengine.USD_26.03.windows_x64.py3.11_Release.zip"
           - os: windows-latest
             platform: windows_x64
             variant: Debug
-            usd_archive: "Lumengine.USD_25.11.windows_x64.py3.11_Debug.zip"
+            usd_archive: "Lumengine.USD_26.03.windows_x64.py3.11_Debug.zip"
           - os: ubuntu-22.04
             platform: linux_x64
             variant: Release
-            usd_archive: "Lumengine.USD_25.11.linux_x64.py3.11_Release.tar.gz"
+            usd_archive: "Lumengine.USD_26.03.linux_x64.py3.11_Release.tar.gz"
           - os: ubuntu-22.04
             platform: linux_x64
             variant: Debug
-            usd_archive: "Lumengine.USD_25.11.linux_x64.py3.11_Debug.tar.gz"
+            usd_archive: "Lumengine.USD_26.03.linux_x64.py3.11_Debug.tar.gz"
     runs-on: ${{ matrix.os }}
 
     steps:
