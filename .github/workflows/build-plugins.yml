@@ -210,12 +210,16 @@ jobs:
     - name: Publish to lumiverseai.fr
       shell: bash
       run: |
+        TAG=$(git describe --tags --abbrev=0)
         for f in dist/*.lmext; do
-          echo "Publishing $f ..."
+          FILENAME=$(basename "$f")
+          PACKAGE_URL="https://github.com/${{ github.repository }}/releases/download/${TAG}/${FILENAME}"
+          echo "Publishing $FILENAME -> $PACKAGE_URL"
           HTTP_CODE=$(curl -s -o /tmp/publish_response.json -w "%{http_code}" \
             -X POST \
             -H "X-API-Key: ${{ secrets.LUMIVERSEAI_API_KEY }}" \
             -F "package=@${f}" \
+            -F "packageUrl=${PACKAGE_URL}" \
             https://api.lumiverseai.fr/api/v1/publish)
           cat /tmp/publish_response.json
           echo ""
