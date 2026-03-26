@@ -206,10 +206,21 @@ jobs:
       run: |
         for f in dist/*.lmext; do
           echo "Publishing $f ..."
-          curl -f -X POST \
+          HTTP_CODE=$(curl -s -o /tmp/publish_response.json -w "%{http_code}" \
+            -X POST \
             -H "X-API-Key: ${{ secrets.LUMIVERSEAI_API_KEY }}" \
             -F "package=@${f}" \
-            https://api.lumiverseai.fr/api/v1/publish
+            https://api.lumiverseai.fr/api/v1/publish)
+          cat /tmp/publish_response.json
+          echo ""
+          if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ]; then
+            echo "OK (${HTTP_CODE})"
+          elif [ "$HTTP_CODE" = "409" ]; then
+            echo "WARNING: Already published with different SHA256 (409), skipping"
+          else
+            echo "ERROR: Publish failed with HTTP ${HTTP_CODE}"
+            exit 1
+          fi
         done
 
     - name: Archive (Windows)
