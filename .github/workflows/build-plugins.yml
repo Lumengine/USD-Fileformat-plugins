@@ -153,6 +153,57 @@ jobs:
     - name: Install
       run: cmake --install build --config ${{ matrix.variant }} --prefix install
 
+    # --- Extension packaging (.lmext) ---
+    - name: Sync manifest version from version file
+      shell: bash
+      run: |
+        VER=$(cat version)
+        python -c "
+        import json; p='manifest.json'
+        d=json.loads(open(p).read())
+        d['version']='$VER'
+        open(p,'w').write(json.dumps(d,indent=4))
+        "
+
+    - name: Determine ABI tag
+      id: abi
+      shell: bash
+      run: |
+        if [ "${{ matrix.os }}" = "windows-latest" ]; then
+          COMPILER="msvc"; ARCH="win64"
+        else
+          COMPILER="gcc"; ARCH="linux64"
+        fi
+        CONFIG=$(echo "${{ matrix.variant }}" | tr '[:upper:]' '[:lower:]')
+        echo "tag=${COMPILER}-${ARCH}-${CONFIG}" >> "$GITHUB_OUTPUT"
+
+    - name: Install lm-package
+      run: pip install lm-package
+
+    - name: Package .lmext
+      shell: bash
+      run: |
+        lm-package . \
+          --build-dir install/plugin/usd \
+          --abi-tag "${{ steps.abi.outputs.tag }}" \
+          --output dist/
+
+    - name: Upload .lmext to GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: dist/*.lmext
+
+    - name: Publish to lumiverseai.fr
+      shell: bash
+      run: |
+        for f in dist/*.lmext; do
+          echo "Publishing $f ..."
+          curl -f -X POST \
+            -H "X-API-Key: ${{ secrets.LUMIVERSEAI_API_KEY }}" \
+            -F "package=@${f}" \
+            https://api.lumiverseai.fr/api/v1/publish
+        done
+
     - name: Archive (Windows)
       if: runner.os == 'Windows'
       id: archive

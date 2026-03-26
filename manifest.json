@@ -1,0 +1,23 @@
+{
+    "formatVersion": 1,
+    "id": "com.lumengine.usd-fileformat-plugins",
+    "name": "USD File Format Plugins",
+    "version": "1.2.0",
+    "description": "Import/export FBX, glTF, OBJ, PLY, SPZ, STL files via USD.",
+    "longDescription": "Seven USD SdfFileFormat plugins enabling Lumengine to open and save industry-standard 3D file formats through Universal Scene Description. Originally developed by Adobe, maintained by Lumengine.",
+    "author": {
+        "name": "Lumengine",
+        "email": "contact@lumiverseai.fr",
+        "url": "https://github.com/Lumengine"
+    },
+    "license": "Apache-2.0",
+    "repository": "https://github.com/Lumengine/USD-Fileformat-plugins",
+    "engine": {
+        "minVersion": "26.0.0"
+    },
+    "categories": ["Importers", "USD"],
+    "tags": ["fbx", "gltf", "obj", "ply", "stl", "spz", "usd", "file-format", "import", "export"],
+    "platforms": ["windows-x64", "linux-x64"],
+    "pluginType": "importer",
+    "permissions": ["filesystem", "usd-stage"]
+}
