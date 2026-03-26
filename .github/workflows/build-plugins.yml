@@ -62,11 +62,21 @@ jobs:
       run: |
           mkdir -p usd_build
           tar -xzf "${{ matrix.usd_archive }}" -C usd_build
-          # Relax Python3 EXACT version in pxrConfig.cmake — the USD build
-          # hardcodes the patch version (e.g. 3.11.14) but the runner may
-          # have a newer patch (e.g. 3.11.15). Minor-compatible is fine.
-          sed -i 's/find_dependency(Python3 3\.11\.[0-9]* EXACT/find_dependency(Python3 3.11/' \
-            usd_build/pxrConfig.cmake || true
+
+    - name: Match Python version to USD build (Linux)
+      if: runner.os == 'Linux'
+      id: usd-python
+      run: |
+          # Extract the exact Python version USD was built against
+          USD_PY_VER=$(grep -oP 'find_dependency\(Python3\s+"?\K[0-9]+\.[0-9]+\.[0-9]+' usd_build/pxrConfig.cmake)
+          echo "USD requires Python ${USD_PY_VER}"
+          echo "version=${USD_PY_VER}" >> "$GITHUB_OUTPUT"
+
+    - name: Install matching Python (Linux)
+      if: runner.os == 'Linux'
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ steps.usd-python.outputs.version }}
 
     - name: Install Linux dependencies
       if: runner.os == 'Linux'
@@ -136,8 +146,6 @@ jobs:
     - name: Configure (Linux)
       if: runner.os == 'Linux'
       run: |
-          PYTHON_PREFIX=$(python -c 'import sys; print(sys.prefix)')
-          PYTHON_VER=$(python -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
           cmake -S . -B build -G Ninja \
             -Dpxr_ROOT="${{ github.workspace }}/usd_build" \
             -DUSD_FILEFORMATS_ENABLE_FBX=ON \
@@ -145,10 +153,7 @@ jobs:
             -DUSD_FILEFORMATS_ENABLE_SBSAR=OFF \
             -DUSD_FILEFORMATS_BUILD_TESTS=OFF \
             -DCMAKE_BUILD_TYPE=${{ matrix.variant }} \
-            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
-            -DPython3_ROOT_DIR="$PYTHON_PREFIX" \
-            -DPython3_INCLUDE_DIR="$PYTHON_PREFIX/include/python${PYTHON_VER}" \
-            -DPython3_LIBRARY="$PYTHON_PREFIX/lib/libpython${PYTHON_VER}.so"
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 
     - name: Build (Windows)
       if: runner.os == 'Windows'
