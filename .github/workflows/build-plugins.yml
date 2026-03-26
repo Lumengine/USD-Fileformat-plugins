@@ -62,6 +62,11 @@ jobs:
       run: |
           mkdir -p usd_build
           tar -xzf "${{ matrix.usd_archive }}" -C usd_build
+          # Relax Python3 EXACT version in pxrConfig.cmake — the USD build
+          # hardcodes the patch version (e.g. 3.11.14) but the runner may
+          # have a newer patch (e.g. 3.11.15). Minor-compatible is fine.
+          sed -i 's/find_dependency(Python3 3\.11\.[0-9]* EXACT/find_dependency(Python3 3.11/' \
+            usd_build/pxrConfig.cmake || true
 
     - name: Install Linux dependencies
       if: runner.os == 'Linux'
