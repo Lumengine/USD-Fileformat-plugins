@@ -146,6 +146,7 @@ jobs:
     - name: Configure (Linux)
       if: runner.os == 'Linux'
       run: |
+          export USD_BUILD_PATH="${{ github.workspace }}/usd_build"
           cmake -S . -B build -G Ninja \
             -Dpxr_ROOT="${{ github.workspace }}/usd_build" \
             -DUSD_FILEFORMATS_ENABLE_FBX=ON \
