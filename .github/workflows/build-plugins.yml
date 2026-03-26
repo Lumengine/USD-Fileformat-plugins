@@ -131,8 +131,8 @@ jobs:
     - name: Configure (Linux)
       if: runner.os == 'Linux'
       run: |
-          export USD_BUILD_PATH="${{ github.workspace }}/usd_build"
-          export USD_PYTHON_PATH="$(python -c 'import sys, os; print(os.path.dirname(sys.executable))')"
+          PYTHON_PREFIX=$(python -c 'import sys; print(sys.prefix)')
+          PYTHON_VER=$(python -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
           cmake -S . -B build -G Ninja \
             -Dpxr_ROOT="${{ github.workspace }}/usd_build" \
             -DUSD_FILEFORMATS_ENABLE_FBX=ON \
@@ -140,7 +140,10 @@ jobs:
             -DUSD_FILEFORMATS_ENABLE_SBSAR=OFF \
             -DUSD_FILEFORMATS_BUILD_TESTS=OFF \
             -DCMAKE_BUILD_TYPE=${{ matrix.variant }} \
-            -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            -DPython3_ROOT_DIR="$PYTHON_PREFIX" \
+            -DPython3_INCLUDE_DIR="$PYTHON_PREFIX/include/python${PYTHON_VER}" \
+            -DPython3_LIBRARY="$PYTHON_PREFIX/lib/libpython${PYTHON_VER}.so"
 
     - name: Build (Windows)
       if: runner.os == 'Windows'
